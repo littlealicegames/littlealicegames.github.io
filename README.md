@@ -9,13 +9,13 @@ Official portfolio website for Little Alice Games, published at
 - `styles.css` contains the complete responsive design; there is no JavaScript runtime.
 - `assets/images/` contains optimized, checked-in web artwork.
 - `assets/fonts/` contains self-hosted Fredoka and Atkinson Hyperlegible Next font files and their OFL licenses.
+- `croak-wars/privacy/` contains the Croak Wars product privacy policy.
 - `tools/optimize_assets.py` documents how the current web image set was produced from local studio source artwork.
 
 ## Publishing
 
 GitHub Pages serves the `main` branch from the repository root. Pushing a commit to `main`
-publishes the update automatically. The separate Croak Wars privacy-policy project remains at
-<https://littlealicegames.github.io/croak-wars-privacy-policy>.
+publishes the update automatically.
 
 ## Maintenance
 
