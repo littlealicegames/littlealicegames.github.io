@@ -4,7 +4,7 @@ import argparse
 
 from pathlib import Path
 
-from PIL import Image
+from PIL import Image, ImageChops
 
 
 SITE_ROOT = Path(__file__).resolve().parents[1]
@@ -35,8 +35,22 @@ def cover_jpeg(source: Path, destination: str, size: tuple[int, int]) -> None:
     )
 
 
-def square_png(source: Path, destination: str, size: int) -> None:
+def square_png(source: Path, destination: str, size: int, trim_background: bool = False) -> None:
     image = Image.open(source).convert("RGBA")
+    if trim_background:
+        background = Image.new("RGBA", image.size, image.getpixel((0, 0)))
+        difference = ImageChops.difference(image, background).convert("L")
+        bounds = difference.point(lambda value: 255 if value > 12 else 0).getbbox()
+        if bounds:
+            padding = round(max(bounds[2] - bounds[0], bounds[3] - bounds[1]) * 0.06)
+            image = image.crop(
+                (
+                    max(0, bounds[0] - padding),
+                    max(0, bounds[1] - padding),
+                    min(image.width, bounds[2] + padding),
+                    min(image.height, bounds[3] + padding),
+                )
+            )
     image.thumbnail((size, size), Image.Resampling.LANCZOS)
     canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
     canvas.alpha_composite(image, ((size - image.width) // 2, (size - image.height) // 2))
@@ -61,7 +75,6 @@ def main() -> None:
 
     studio_banner = args.downloads / "CroakWars" / "LittleAliceGames&Tools.png"
     publisher_logo = args.downloads / "logo_publisher.png"
-    croak_icon = args.unity_root / "Assets" / "Resources" / "CroakWarsLogo.png"
 
     fit_within(studio_banner, "studio-pond.webp", (1600, 1000), quality=84)
     fit_within(studio_banner, "studio-pond-1200.webp", (1200, 675), quality=82)
@@ -108,8 +121,8 @@ def main() -> None:
     )
 
     cover_jpeg(studio_banner, "og-image.jpg", (1200, 630))
-    square_png(croak_icon, "favicon-32.png", 32)
-    square_png(croak_icon, "apple-touch-icon.png", 180)
+    square_png(publisher_logo, "favicon-32.png", 32, trim_background=True)
+    square_png(publisher_logo, "apple-touch-icon.png", 180, trim_background=True)
 
 
 if __name__ == "__main__":
