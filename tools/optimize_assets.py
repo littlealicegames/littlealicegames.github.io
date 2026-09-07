@@ -1,10 +1,11 @@
 """Build the web-ready image set from the studio's source artwork."""
 
 import argparse
+from collections import deque
 
 from pathlib import Path
 
-from PIL import Image, ImageChops
+from PIL import Image
 
 
 SITE_ROOT = Path(__file__).resolve().parents[1]
@@ -35,12 +36,60 @@ def cover_jpeg(source: Path, destination: str, size: tuple[int, int]) -> None:
     )
 
 
+def remove_edge_background(image: Image.Image, tolerance: int = 24) -> Image.Image:
+    """Make only the near-white background connected to the canvas edge transparent."""
+    image = image.copy()
+    width, height = image.size
+    pixels = image.load()
+    background = pixels[0, 0][:3]
+    connected = bytearray(width * height)
+    queue: deque[tuple[int, int]] = deque()
+
+    def add_if_background(x: int, y: int) -> None:
+        index = y * width + x
+        if connected[index]:
+            return
+        red, green, blue, alpha = pixels[x, y]
+        if alpha and max(
+            abs(red - background[0]),
+            abs(green - background[1]),
+            abs(blue - background[2]),
+        ) <= tolerance:
+            connected[index] = 1
+            queue.append((x, y))
+
+    for x in range(width):
+        add_if_background(x, 0)
+        add_if_background(x, height - 1)
+    for y in range(height):
+        add_if_background(0, y)
+        add_if_background(width - 1, y)
+
+    while queue:
+        x, y = queue.popleft()
+        if x:
+            add_if_background(x - 1, y)
+        if x + 1 < width:
+            add_if_background(x + 1, y)
+        if y:
+            add_if_background(x, y - 1)
+        if y + 1 < height:
+            add_if_background(x, y + 1)
+
+    output = list(image.getdata())
+    for index, is_background in enumerate(connected):
+        if is_background:
+            red, green, blue, _ = output[index]
+            output[index] = (red, green, blue, 0)
+    image.putdata(output)
+    return image
+
+
 def square_png(source: Path, destination: str, size: int, trim_background: bool = False) -> None:
     image = Image.open(source).convert("RGBA")
     if trim_background:
-        background = Image.new("RGBA", image.size, image.getpixel((0, 0)))
-        difference = ImageChops.difference(image, background).convert("L")
-        bounds = difference.point(lambda value: 255 if value > 12 else 0).getbbox()
+        image = remove_edge_background(image)
+        bounds = image.getbbox()
         if bounds:
             padding = round(max(bounds[2] - bounds[0], bounds[3] - bounds[1]) * 0.06)
             image = image.crop(
